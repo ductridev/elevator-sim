@@ -173,4 +173,27 @@ describe('dispatcher cost', () => {
     b.elevators[1].setFloor(5);
     assert.strictEqual(b.callHall(6, UP), 2);
   });
+
+  // A down-call above a cabin's committed sweep: it must climb to the call
+  // first, so the cost must not go negative and steal the call.
+  it('does not underprice a down-call above the up-sweep top', () => {
+    const b = new Building({ floors: 10, elevatorCount: 3, dwellTicks: 3 });
+    b.elevators[0].setFloor(6); // #1 heading up, only a down-call at 6 pending
+    b.elevators[0].setDirection(UP);
+    b.elevators[0].assignHallCall(6, DOWN);
+    b.elevators[1].setFloor(10); // #2 idle at the top
+    b.elevators[2].setFloor(1); // #3 idle at the bottom
+    // #1 cost = climb 6->8 then back = 2; #2 idle = 2. Tie -> idle #2 wins.
+    assert.strictEqual(b.callHall(8, DOWN), 2);
+  });
+
+  // On equal cost, the idle cabin is preferred over an already-committed one.
+  it('prefers an idle cabin over a committed one on a tie', () => {
+    const b = new Building({ floors: 10, elevatorCount: 2, dwellTicks: 3 });
+    b.elevators[0].setFloor(3); // #1 committed, 2 floors from the call
+    b.elevators[0].setDirection(UP);
+    b.elevators[0].addCarCall(9);
+    b.elevators[1].setFloor(7); // #2 idle, also 2 floors from the call
+    assert.strictEqual(b.callHall(5, UP), 2);
+  });
 });
